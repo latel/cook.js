@@ -33,6 +33,7 @@ cookJs.define("css", [], function() {
         return prop = props.join("");
     }
     //3. 修正值，如style['width']=32 会被修正为32px(缺省)
+
     return {
         //添加类名
         addClass: function(obj, value) {
@@ -56,7 +57,7 @@ cookJs.define("css", [], function() {
                 }
 
                 //清除我们在上面为了方便匹配而在首尾额外添加的空格
-                finalValue = cookJs.extend.trim(current);
+                finalValue = cookJs.trim(current);
 
                 //只有在真正发生更改时才去更新
                 if (finalValue != obj.className)
@@ -87,7 +88,7 @@ cookJs.define("css", [], function() {
                 }
 
                 //清除我们在上面为了方便匹配而在首尾额外添加的空格
-                finalValue = cookJs.extend.trim(current);
+                finalValue = cookJs.trim(current);
 
                 //只有在真正发生更改时才去更新
                 if (finalValue != obj.className)
@@ -160,6 +161,19 @@ cookJs.define("css", [], function() {
                 obj.setAttribute(name, value, true);
             }
         },
+        //移除属性
+        removeAttr: function(obj, value) {
+            var i = 0, attrNames, attrName;
+            attrNames = value && value.match(/\S+/g);
+            //如果没有指定要移除的name或obj不是一个节点就返回
+            if (!attrNames || obj.nodeType !== 1)
+                return false;
+
+            while (attrName = attrNames[i++]) {
+                //我们似乎应当对bool值区分对待，暂时不考虑
+                obj.removeAttribute(attrName);
+            }
+        },
         //设置样式
         style: function(obj, key, value) {
             //分三种情况
@@ -195,7 +209,8 @@ cookJs.define("css", [], function() {
             }
         },
         //获取匹配元素的文本
-        text: function() {},
+        text: function() {
+        },
         //最后，向外界公开模块的一些基本信息
         version: '0.0.1'
     };
