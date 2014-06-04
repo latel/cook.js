@@ -3,10 +3,12 @@
  *               用于研究目的模块和文件加载器的精简实现， 然而
  *               它同样可以完美的胜任绝大部分工作。
  * @author       latelx64@gmail.com (Kezhen Wong)
- * @version      0.1-dev
+ * @version      0.2-dev
  * @link         https://github.com/latel/cook.js
  * @license      GPL
  * @todo         完善使用文档,单元测试和容错
+ *               完善兼容不标准的模块，如jquery
+ *               支持插件 （语法 模块名!，如core://domReady!，插件区别于核心模块库）
  */
 
 //外部缩写接口，以期兼容requireJs
@@ -31,12 +33,12 @@ cookjs = (function (window) {
     /**
      * 维护模块内部的环境
      * @var {String}  baseUrl   引用用户模块文件的相对URL路径
-     * @var {String}  coreUrl   加载器自带的模块文件地址
+     * @var {String}  repoUrl   加载器自带的模块目录地址
      * @var {Object}  moduleMap 已载入的模块定义表
      * @var {Object}  cfg       寄存运行时的配置
      */
     var moduleDefQueue = [];
-    var baseUrl, coreUrl,
+    var baseUrl, repoUrl,
         moduleMap = {},
         cfg = {paths: {}, oldies: {}, ready: {}},
         headNode = document.head || document.getElementsByTagName("head")[0];
@@ -44,7 +46,7 @@ cookjs = (function (window) {
      * 缓存一些正则
      */
     var trimRegExp  = /^\s+|\s+$/g,
-        isCore      = /^core:\/\//i,
+        isRepo      = /^(core|extra|community):\/\//i,
         realJs      = /\.js$/ig,
         endWithSlash   = /\/$/;
 
@@ -54,18 +56,18 @@ cookjs = (function (window) {
      */
     var cookJsNode = document.scripts[document.scripts.length - 1],
         dataMain   = cookJsNode.getAttribute("data-main"),
-        coreUrl    = cookJsNode.getAttribute("data-coreUrl"),
+        repoUrl    = cookJsNode.getAttribute("data-repoUrl"),
         baseUrl    = cookJsNode.getAttribute("data-baseUrl"),
         autoLoad   = cookJsNode.getAttribute("data-autoLoad"),
         main;
-    coreUrl = coreUrl? 
-        (endWithSlash.test(coreUrl)?
-            coreUrl : 
-            coreUrl + "/"
+    repoUrl = repoUrl? 
+        (endWithSlash.test(repoUrl)?
+            repoUrl : 
+            repoUrl + "/"
         ) : 
         ((cookJsNode.src.indexOf("/") > 0)?
-            cookJsNode.src.substring(0, cookJsNode.src.lastIndexOf("/") + 1) + "core/" : 
-            "core/"
+            cookJsNode.src.substring(0, cookJsNode.src.lastIndexOf("/") + 1) : 
+            "./"
         );
     baseUrl = baseUrl?
         (endWithSlash.test(baseUrl)?
@@ -109,8 +111,8 @@ cookjs = (function (window) {
     function parseJsPath (module) {
         return realJs.test(module)? 
             module :
-            isCore.test(module)? 
-                coreUrl + module.replace(isCore, "") + ".js" : 
+            isRepo.test(module)? 
+                repoUrl + module.match(isRepo)[0].replace(":/", "")+ module.replace(isRepo, "") + ".js" : 
                 baseUrl + module + ".js";
     }
     /**
@@ -158,7 +160,7 @@ cookjs = (function (window) {
             };
         }
         /**
-         * 我们先定义事件函数，因为IE有有可能在给src复制后便立即开始加载相应
+         * 我们先定义事件函数，因为IE有可能在给src复制后便立即开始加载相应
          * 的脚本文件，而不管我们是否已经将其插入到Dom中
          */
         scriptNode.src = url;
@@ -214,8 +216,8 @@ cookjs = (function (window) {
                 configr = module;
                 if (typeof configr.baseUrl === "string")
                     baseUrl = (configr.baseUrl.indexOf("/", configr.baseUrl.length - 1) > 0) ? configr.baseUrl.substr(0, -2) : configr.baseUrl;
-                if (typeof configr.coreUrl === "string")
-                    coreUrl = (configr.coreUrl.indexOf("/", configr.coreUrl.length - 1) > 0) ? configr.coreUrl.substr(0,-2) : configr.coreUrl;
+                if (typeof configr.repoUrl === "string")
+                    repoUrl = (configr.repoUrl.indexOf("/", configr.repoUrl.length - 1) > 0) ? configr.repoUrl.substr(0,-2) : configr.repoUrl;
                 for (i in configr.paths) {
                     if (configr.paths.hasOwnProperty(i) && i !== "baseUrl") {
                         cfg["paths"][i] = (configr.paths[i].indexOf("/", configr.paths[i].length - 1) > 0) ? 
@@ -268,7 +270,6 @@ cookjs = (function (window) {
         require: function (deps, factory) {
             var module, i, j, k, l, m = 0, self = this, len, entityList = [], nestDeps, nestDepsLen, nestDepsToRequire = [], entity, src, allCached = true;
             var register;
-            console.log(this);
             switch (arguments.length) {
                 case 3:
                     register = arguments[2];
@@ -424,4 +425,6 @@ cookjs = (function (window) {
  * 2014/05/08    0.2-dev    cookJs.ready, cookJs.require和cookJs.define添加了ready, require和define的全局变量缩写引用，
  *                          这样就可以使用requireJs或其他加载器的标准化模块兼容了
  * 2014/05/09    0.2-dev    错误和兼容性修正
+ * 2014/06/03    0.2-dev    cook.js现在支持模块库了 [core://, extra://, community://], 
+ *                          分别用开支持核心库模块，扩展支持库模块和社区库模块
  */

@@ -2,20 +2,26 @@
  * 节点选择器
  * 匹配节点并返回一个包装过的对象
  * @version 0.0.1
- * @link    https://github.com/latel/cookJs/module/fizzle.js
+ * @link    https://github.com/latel/cook.js/core/fizzle.js
  * @example 参见Jquery手册，因为我们完全在模仿人家
  *          实际上，这个模块完全是用来练手的 ´ ▽ ` )ﾉ
- * @todo    遗留的陷入死循环的设计缺陷
+ * @todo    遗留的陷入死循环的设计缺陷,
+ *          容错处理，无论结果如何都返回一个Fizzle实例。这样就不会会因为返回不正确而影响到promise模型了
+ *          更改根据字符串方式创建节点的方式(jquery太伟大了)
  */
 
-//ready("fizzle", function () {
-//    window.$ = this;
-//});
+ready("fizzle", function () {
+    window.$ = this;
+});
 
 define(["core://css", "core://events", "core://base"], function (css, events) {
     //我们先定义一些常用的正则检测
     //1.是否是个形如"#id"的简单字符串
-    var exprId = /^#(\w)+$/;
+    //2...
+    //3...
+    //...
+    var exprId = /^#(\w)+$/,
+        exprIsNewEl = /^</;
     
     //其次定义一个重要的函数
     //函数负责对单个选择器的解析并按其提取节点
@@ -213,6 +219,8 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         //2. 匹配到的元素的长度
         var length = 0, i, j, crumbs, nodes = [], node, selectorEl, offset = 0;
 
+        this.selector = selector;
+
         //保证集合中至少有一个元素
         selector = selector || document;
         //保证有初始上下文，默认亦为document
@@ -225,8 +233,8 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         //现在我们依次对每个情况做出处理
 
         //1..
-        //如果是window对象就直接返回
-        if (typeof selector === document || cookjs.isWindow(selector))
+        //如果是window对象或Fizzle实例就直接返回
+        if (selector instanceof Fizzle || typeof selector === document || cookjs.isWindow(selector))
             return selector;
 
         //2..
@@ -234,6 +242,15 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         if (selector.nodeType === 1) {   
             this[offset]     = selector;
             this.length = 1;
+        }
+
+        //3..
+        //是不是HTMLCollection
+        if (Object.prototype.toString.call(selector) === "[object HTMLCollection]") {
+            len = this.length = selector.length;
+            for (var i = 0; i < len; i++) {
+                this[offset++] = selector[i];
+            }
         }
 
         //3..
@@ -247,31 +264,58 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                 this[offset]     = elem;
                 this.length = 1;
             } else {
-                //运行到这里意味着选择器是个比较复杂的形式
-                //@var {String} selectorEl 选择器的单个元素，如：
-                //    $("div#nerd.is ul.happy li p, input.me");
-                //    将会被视为
-                //        div#nerd.is ul.happy li p,
-                //        input.me
-                //    2个选择器所匹配的元素的组合
-                //@var {Array} nodes 临时存储匹配到的节点
-                selectorEl  = selector.split(",");
-                this.length = 0;
-                for (i = 0, len = selectorEl.length; i < len; i++) {
-                    j     = 0;
-                    //空白的节点不应该被检测，写错了？
-                    if (selectorEl[i] && !/^\s+$/.test(selectorEl[i])) {
-                        nodes = matchEl(selectorEl[i], context);
-                        while (node = nodes[j++]) {
-                            this[offset++] = node;
-                            this.length++;
+                //判断是否以"<"打头, 有的话我们将不去做解析，而是建立解析并创建节点元素
+                if (exprIsNewEl.test(selector)) {
+                    this[0] = createElement(selector);
+                    this[offset] = this[0];
+                    this.length = 1;
+                } else {
+                    //运行到这里意味着选择器是个比较复杂的形式
+                    //@var {String} selectorEl 选择器的单个元素，如：
+                    //    $("div#nerd.is ul.happy li p, input.me");
+                    //    将会被视为
+                    //        div#nerd.is ul.happy li p,
+                    //        input.me
+                    //    2个选择器所匹配的元素的组合
+                    //@var {Array} nodes 临时存储匹配到的节点
+                    selectorEl  = selector.split(",");
+                    this.length = 0;
+                    for (i = 0, len = selectorEl.length; i < len; i++) {
+                        j     = 0;
+                        //空白的节点不应该被检测，写错了？
+                        if (selectorEl[i] && !/^\s+$/.test(selectorEl[i])) {
+                            nodes = matchEl(selectorEl[i], context);
+                            while (node = nodes[j++]) {
+                                this[offset++] = node;
+                                this.length++;
+                            }
                         }
                     }
                 }
             }
         }
 
+        //重置节点偏移
         this.offset = 0;
+    };
+
+    /**
+     * 根据字符串，构造一个新的节点元素
+     */
+    var createElement = function (constructor) {
+        var j;
+        // IE6-8不能正确的序列化 link, script, style 和 任意html5 标签
+        // 除非以div包裹并且前缀一个不可被切割的字符
+		var wrapMap = cookjs.genSupport() && support.htmlSerialize ? [ 1, "", "" ] : [ 2, "X<div>", "</div>"  ]
+        var fragment = document.createDocumentFragment(),
+            tmp = fragment.appendChild(document.createElement("DIV"));
+            tmp.innerHTML = wrapMap[1] + constructor + wrapMap[2];
+        //层层深入获取到正确的内容
+        j = wrapMap[0];
+        while ( j-- ) {
+            tmp = tmp.children[tmp.children.length -1];
+        }
+        return tmp;
     };
 
     //像Jquery一样封装一些方法使之成为fizzle对象？
@@ -292,12 +336,34 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                 return this[index];
             }
         },
+        dom: function () {
+            var c = [], d = 0;
+            if (this.length >= 1) {
+                while (this[d]) {
+                    c.push(this[d++]);
+                }
+            }
+            return c.length >1? c : c[0];
+        },
+        /**
+         * 清空包装对象中已有的节点对象列表
+         * @method empty
+         * @retutn {Void}
+         */
+        empty: function () {
+            var i = 0;
+            for (; i < this.length; i++) {
+                delete this[i];
+            }
+            this.length = 0;
+        },
         //添加类名
         addClass: function (value) {
             var i = 0, node, offset = this["offset"];
             while (node = this[i++]) {
                 css.addClass(node, value);
             }
+            return this;
         },
         //移除类名
         removeClass: function (value) {
@@ -305,6 +371,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
             while (node = this[i++]) {
                 css.removeClass(node, value);
             }
+            return this;
         },
         //切换类名
         toggleClass: function (value, stateVal) {
@@ -312,18 +379,114 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
             while (node = this[i++]) {
                 css.toggleClass(node, value, stateVal);
             }
+            return this;
         },
         //判断是否有某个/某些类名
         hasClass: function (value) {
             var i, offset = this["offset"];
             return css.hasClass(this[offset], value);
         },
+        before: function () {
+        },
+        after: function () {
+        },
+        //找到所有的兄弟节点(包括自己)
+        brothers: function () {
+            return new Fizzle(this[0].parentNode.children);
+        },
+        //找到最接近的前一个符合条件的兄弟节点
+        prev: function (selector) {
+            var n = this[0];
+            do {
+                n = n.previousSibling;
+            } while (n && n.nodeType !== 1);
+            return new Fizzle(n);
+        },
+        //找到最接近的后一个符合条件的兄弟节点
+        next: function (selector) {
+            var n = this[0];
+            do {
+                n = n.nextSibling;
+            } while (n && n.nodeType !== 1);
+            return new Fizzle(n);
+        },
+        //将节点插入到targetNode容器内的最后位置
+        appendTo: function (targetNode) {
+            if (targetNode instanceof Fizzle)
+                targetNode[0].appendChild(this[0]);
+            else if (targetNode.nodeType === 1)
+                targetNode.appendChild(this[0]);
+            return this;
+        },
+        //将节点node插入到容器内的最后位置
+        append: function (node2Append) {
+            var i = 0, node, offset = this["offset"];
+            if (node2Append instanceof Fizzle)
+                node2Append = node2Append.dom();
+            if (node2Append.nodeType !== 1 && typeof node2Append === "string")
+                node2Append = createElement(node2Append);
+            while (node = this[i++]) {
+                node.appendChild(node2Append);
+            }
+            return new Fizzle(node2Append);
+        },
+        insertBefore: function (node2Append, ref) {
+            var i = 0, node, offset = this["offset"];
+            if (node2Append instanceof Fizzle)
+                node2Append = node2Append.dom();
+            if (node2Append.nodeType !== 1 && typeof node2Append === "string")
+                node2Append = createElement(node2Append);
+            while (node = this[i++]) {
+                if (typeof ref === "number") {
+                    if (node[ref])
+                        node.insertBefore(node2Append, ref);
+                    else
+                        node.appendChild(node2Append);
+                } else if (ref && ref.nodeType === 1) {
+                    node.insertBefore(node2Append, ref);
+                }
+            }
+            return new Fizzle(node2Append);
+        },
+        insertAfter: function (node2Append, ref) {
+            var i = 0, node, offset = this["offset"];
+            if (node2Append instanceof Fizzle)
+                node2Append = node2Append.dom();
+            if (node2Append.nodeType !== 1 && typeof node2Append === "string")
+                node2Append = createElement(node2Append);
+            while (node = this[i++]) {
+                if (typeof ref === "number") {
+                    ref = node[ref] ? node[ref] : node.lastChild;
+                }
+                if (ref && ref.nodeType === 1) {
+                    if (ref === node.lastChild) {
+                        node.appendChild(node2Append);
+                    } else {
+                        node.insertBefore(node2Append, ref.nextSbling);
+                    }
+                }
+            }
+        },
+        /**
+         * 移除一个节点
+         * @method remove
+         * @return {Boolean} 是否移除成功
+         */
+        remove: function () {
+            var i = 0, node, offset = this["offset"];
+            while (node = this[i++]) {
+                if (!node.parentNode || node.parentNode === node)
+                    continue;
+                node.parentNode.removeChild(node);
+            }
+            return true;
+        },
         //获取或设置一个属性的值
         attr: function (name, value) {
             var i, offset = this["offset"];
             return css.attr(this[offset], name, value);
         },
-        //炒菜
+        //炒菜, 这也是整个框架为什么叫做cook.js的原因吧，哈
         cook: function (condiment) {
             var i, offset = this["offset"];
             for (i in condiment) {
@@ -349,6 +512,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                     while (node = this[i++]) {
                         css.style(node, style, val);
                     }
+                    return this;
                 }
             }
         },
@@ -385,6 +549,21 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         find: function (selector) {
             return new Fizzle(selector, this[0]);
         },
+        //向祖先节点寻找最新的匹配元素
+        closest: function (selector) {
+            var matched = [],
+                i = 0,
+                cur,
+                l = this.length;
+            for ( ; i < l; i++ ) {
+                for ( cur = this[i].parentNode; cur && cur !== document; cur = cur.parentNode ) {
+                    if (cur.tagName === selector.toUpperCase())
+                        matched.push(cur);
+                    break;
+                }
+            }
+            return matched.length > 1? matched : new Fizzle(matched[0]);
+        },
         //设置innerHTML
         html: function (text) {
             var i = 0, node, offset = this["offset"];
@@ -396,6 +575,10 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                     node.innerHTML = text;
                 }
         },
+        //获取第一个元素的outerHTML
+        outerHTML: function () {
+            return this[0] && this[0].outerHTML;
+        },
         //排除元素
         not: function () {
         },
@@ -406,6 +589,12 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                 evIds.push(events.on(node, ets, comp));
             }   
             return evIds.length > 1? evIds : evIds[0];
+        },
+        live: function (ets, comp) {
+            var node, i = offset = this["offset"];
+            while (node = this[i++]) {
+                events.live(this.selector, ets, comp);
+            }   
         },
         click: function(et) {
             return this.on({click : et});
@@ -454,6 +643,20 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                 return y;
             } else
                 return this[offset].offsetTop;
+        },
+        /**
+         * @method parent
+         * @param  {Integer}  index  将会选取父节点中第index个节点并且包装然后返回,
+         *                           如果不指定，将仅仅返回包装后的父节点
+         * @return {Object}   包装后的节点对象
+         */
+        parent: function (index) {
+            var prt = this[0].parentNode;
+            if (typeof index === "undefined")
+                return new Fizzle(prt);
+            if (typeof index === "number" && prt.hasChildNodes() && prt.children[index])
+                return new Fizzle(prt.children[index]);
+            return new Fizzle();
         },
         //获取在父节点中的顺序
         parentIndex: function () {
@@ -515,4 +718,18 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
  *                      添加了find()方法
  *                      修改了innerHtml()方法,并重命名为html()
  * 2014/04/12   0.0.1   修正了一个指定选择器上下文无效的问题
+ * 2014/05/10   0.0.1   添加了outerHTML(),after(), before()方法,
+ *                      详细的区别，请引用jquery手册
+ *                      现在如果选择其中出现”<“，fizzle将会认为是需要创建一个新的元素节点
+ * 2014/05/11   0.0.1   添加了remove()方法
+ *                      添加了基本的closest()支持，需要改进
+ * 2014/05/13   0.0.1   添加了parent(), empty()方法,
+ *                      改写了remove()方法的逻辑，现在主语更改为需要被移除的节点
+ * 2014/05/17   0.0.1   重要:修改了通过html标签创建元素的方法,向jquery致敬
+ * 2014/05/19   0.0.1   修正了parent()方法中 typeof undefined = undefined的错误
+ *                      添加了dom()方法
+ *                      添加了prev()和next()方法
+ * 2014/05/22   0.0.1   更改了一些方法默认的返回值，未来大部分方法的返回都将更新为Fizzle对象
+ *                      以提升容错能力，见 Todo
+ * 2014/05/30   0.0.1   添加了insertBefore()和insertAfter()方法
  */

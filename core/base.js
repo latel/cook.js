@@ -3,12 +3,13 @@
  *               附送的一些好用的工具？
  * @author       latelx64@gmail.com (Kezhen Wong)
  * @version      0.1
- * @link         https://github.com/latel/cook.js/module/core.js
+ * @link         https://github.com/latel/cook.js/core/core.js
  */
 ready("core://base", function(){
     var host;
     cookjs.extend(this);
     host = cookjs.detectHost();
+    window.support = {};
     window.is = {};
     if (host !== null)
         window.is[host[0]] = host[1].replace(/[.].*/, "");
@@ -66,6 +67,34 @@ define(function () {
             }
 
             return keys;
+        },
+        /**
+         * Helper function for iterating over an array. If the func returns
+         * a true value, it will break out of the loop.
+         */
+        each: function (ary, func) {
+            if (ary) {
+                var i;
+                for (i = 0; i < ary.length; i += 1) {
+                    if (ary[i] && func(ary[i], i, ary)) {
+                        break;
+                    }
+                }
+            }
+        },
+        /**
+         * Helper function for iterating over an array backwards. If the func
+         * returns a true value, it will break out of the loop.
+         */
+        eachReverse: function (ary, func) {
+            if (ary) {
+                var i;
+                for (i = ary.length - 1; i > -1; i -= 1) {
+                    if (ary[i] && func(ary[i], i, ary)) {
+                        break;
+                    }
+                }
+            }
         },
         //将目标转换为数组
         makeArray: function (iterable) {
@@ -179,6 +208,22 @@ define(function () {
                                        (s = userAgent.match(/version\/([\d.]+).*safari/)) ? 
                                            ["Safari", s[1]] : 
                                            null;
+        },
+        //生成一些support列表，
+        //以便其他模板可以检查浏览器对一些特性的支持情况
+        genSupport: function () {
+            if (window.support)
+                return true;
+            window.support = {};
+            var input = document.createElement( "input" ),
+                div = document.createElement( "div" ),
+                fragment = document.createDocumentFragment();
+            div.innerHTML = "  <link/><table></table><a href='/a'>a</a><input type='checkbox'/>";
+            support.leadingWhitespace = div.firstChild.nodeType === 3;
+            support.tbody = !div.getElementsByTagName( "tbody" ).length;
+            support.htmlSerialize = !!div.getElementsByTagName( "link" ).length;
+            support.html5Clone = document.createElement( "nav" ).cloneNode( true ).outerHTML !== "<:nav></:nav>";
+            return true;
         },
         //一些借鉴其他语言的增强功能
         /**

@@ -2,7 +2,7 @@
  * @fileoverview 元素的样式和属性管理模块
  * @author       latelx64@gmail.com (Kezhen Wong)
  * @version      0.0.1
- * @link         https://github.com/latel/cookJs/module/css.js
+ * @link         https://github.com/latel/cook.js/core/css.js
  */
 
 define(["core://base"], function() {

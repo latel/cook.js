@@ -4,7 +4,7 @@
  * 包含多种控件类型的支持
  * 支持主题并且支持动态切换
  * @version 0.0.1
- * @link    https://github.com/latel/cookJs/module/ui.js
+ * @link    https://github.com/latel/cook.js/core/ui.js
  * @example 
  * @todo    提高兼容性，制作更多的主题
  */

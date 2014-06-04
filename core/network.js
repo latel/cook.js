@@ -2,10 +2,10 @@
  * @fileoverview 统一的用于和网络通信模块 
  * @author       latelx64@gmail.com (Kezhen Wong)
  * @version      0.0.1
- * @link         https://github.com/latel/cookJs/module/network.js
+ * @link         https://github.com/latel/cook.js/core/network.js
  */
 
-define(function () {
+define(["core://json2"], function () {
     var init = function () {
             var xmlHttp;
             if (window.XMLHttpRequest) {
