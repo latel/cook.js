@@ -449,6 +449,8 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
             return new Fizzle(node2Append);
         },
         insertAfter: function (node2Append, ref) {
+            if (typeof ref === "undefined")
+                return this.append(node2Append);
             var i = 0, node, offset = this["offset"];
             if (node2Append instanceof Fizzle)
                 node2Append = node2Append.dom();
@@ -732,4 +734,5 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
  * 2014/05/22   0.0.1   更改了一些方法默认的返回值，未来大部分方法的返回都将更新为Fizzle对象
  *                      以提升容错能力，见 Todo
  * 2014/05/30   0.0.1   添加了insertBefore()和insertAfter()方法
+ * 2014/06/03   0.0.1   修复了insertAfter()方法中ref若不合法变添加失败的问题
  */
