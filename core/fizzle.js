@@ -4,10 +4,9 @@
  * @version 0.0.1
  * @link    https://github.com/latel/cook.js/core/fizzle.js
  * @example 参见Jquery手册，因为我们完全在模仿人家
- *          实际上，这个模块完全是用来练手的 ´ ▽ ` )ﾉ
- * @todo    遗留的陷入死循环的设计缺陷,
- *          容错处理，无论结果如何都返回一个Fizzle实例。这样就不会会因为返回不正确而影响到promise模型了
- *          更改根据字符串方式创建节点的方式(jquery太伟大了)
+ *          实际上，这个模块完全是用来理解和学习的ヾ(´ε`ヾ)
+ * @todo    遗留的陷入死循环的设计缺陷
+ *          如果浏览器支持querySelectorAll()，我们应该优先使用该方法以期提高性能
  */
 
 ready("fizzle", function () {
@@ -15,6 +14,10 @@ ready("fizzle", function () {
 });
 
 define(["core://css", "core://events", "core://base"], function (css, events) {
+    //保存原始$的定义
+    if (typeof $ !== "undefined")
+        var dollar = $;
+
     //我们先定义一些常用的正则检测
     //1.是否是个形如"#id"的简单字符串
     //2...
@@ -217,14 +220,16 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         //申明fizzle对象中的属性
         //1. 以[0]开始的数组，存储匹配到的元素（隐藏）
         //2. 匹配到的元素的长度
-        var length = 0, i, j, crumbs, nodes = [], node, selectorEl, offset = 0;
-
-        this.selector = selector;
+        var length = 0, i, j, crumbs, nodes = [], node, selectorEl;
 
         //保证集合中至少有一个元素
         selector = selector || document;
         //保证有初始上下文，默认亦为document
         context  = context && (context.nodeType === 1 || context.nodeType === 9) ? context : document;
+
+        this.selector = selector;
+        this.context = context;
+        this.offset = 0;
 
         //根据给定的selector类型，可能有以下几种类型
         //1. 本身是Windoow或document对象
@@ -240,7 +245,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         //2..
         //DOM元素的nodeType值均为1
         if (selector.nodeType === 1) {   
-            this[offset]     = selector;
+            this[this.offset] = selector;
             this.length = 1;
         }
 
@@ -249,7 +254,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         if (Object.prototype.toString.call(selector) === "[object HTMLCollection]") {
             len = this.length = selector.length;
             for (var i = 0; i < len; i++) {
-                this[offset++] = selector[i];
+                this[this.offset++] = selector[i];
             }
         }
 
@@ -261,14 +266,15 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
             //如果选择器为类似#id的简单形式，则调用原生的方法以提升效率
             if (exprId.test(selector)) {
                 var elem    = document.getElementById(selector.replace("#", ""));
-                this[offset]     = elem;
+                this[this.offset]     = elem;
                 this.length = 1;
             } else {
                 //判断是否以"<"打头, 有的话我们将不去做解析，而是建立解析并创建节点元素
                 if (exprIsNewEl.test(selector)) {
                     this[0] = createElement(selector);
-                    this[offset] = this[0];
+                    this[this.offset] = this[0];
                     this.length = 1;
+                    this.selector = "";
                 } else {
                     //运行到这里意味着选择器是个比较复杂的形式
                     //@var {String} selectorEl 选择器的单个元素，如：
@@ -286,7 +292,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                         if (selectorEl[i] && !/^\s+$/.test(selectorEl[i])) {
                             nodes = matchEl(selectorEl[i], context);
                             while (node = nodes[j++]) {
-                                this[offset++] = node;
+                                this[this.offset++] = node;
                                 this.length++;
                             }
                         }
@@ -322,28 +328,44 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
     Fizzle.prototype = {
         //对外的公开的
         //用于获取fizzle对象内部信息的闭包
+        //使Fizzle对象成为一个类数组对象
         size: function () {
             return this.length;
         },
         get: function (index) {
             if (index== undefined) {
-                var ret= [];
-                for (var i= 0; i< length; i++) {
-                    ret[i]= this[i];
+                var ret = [], d = 0;
+                if (this.length >= 1) {
+                    while (this[d]) {
+                        ret.push(this[d++]);
+                    }
                 }
                 return ret;
-            }else {
-                return this[index];
+            } else {
+                return (index > this.length)? this[0] : this[index];
             }
         },
+        current: function () {
+            return this[this.offset];
+        },
+        rewind: function () {
+            this.offset = 0;
+            return this;
+        },
         dom: function () {
-            var c = [], d = 0;
-            if (this.length >= 1) {
-                while (this[d]) {
-                    c.push(this[d++]);
-                }
+            var ret = this.get();
+            return ret.length > 1? ret : ret[0];
+        },
+        toArray: function () {
+            return this.get();
+        },
+        reverse: function () {
+            var origin = this.get(), i = 0, len = origin.length;
+            for (; i < len; i++) {
+                this[i] = origin[len - i -1];
             }
-            return c.length >1? c : c[0];
+            this.offset = len -1 - this.offset;
+            return this;
         },
         /**
          * 清空包装对象中已有的节点对象列表
@@ -355,11 +377,11 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
             for (; i < this.length; i++) {
                 delete this[i];
             }
-            this.length = 0;
+            this.offset = this.length = 0;
         },
         //添加类名
         addClass: function (value) {
-            var i = 0, node, offset = this["offset"];
+            var i = 0, node;
             while (node = this[i++]) {
                 css.addClass(node, value);
             }
@@ -367,7 +389,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         },
         //移除类名
         removeClass: function (value) {
-            var i = 0, node, offset = this["offset"];
+            var i = 0, node;
             while (node = this[i++]) {
                 css.removeClass(node, value);
             }
@@ -375,7 +397,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         },
         //切换类名
         toggleClass: function (value, stateVal) {
-            var i = 0, node, offset = this["offset"];
+            var i = 0, node;
             while (node = this[i++]) {
                 css.toggleClass(node, value, stateVal);
             }
@@ -383,8 +405,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         },
         //判断是否有某个/某些类名
         hasClass: function (value) {
-            var i, offset = this["offset"];
-            return css.hasClass(this[offset], value);
+            return css.hasClass(this[this.offset], value);
         },
         before: function () {
         },
@@ -420,7 +441,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         },
         //将节点node插入到容器内的最后位置
         append: function (node2Append) {
-            var i = 0, node, offset = this["offset"];
+            var i = 0, node;
             if (node2Append instanceof Fizzle)
                 node2Append = node2Append.dom();
             if (node2Append.nodeType !== 1 && typeof node2Append === "string")
@@ -433,7 +454,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         insertBefore: function (node2Append, ref) {
             if (typeof ref === "undefined")
                 return this.append(node2Append);
-            var i = 0, node, offset = this["offset"];
+            var i = 0, node;
             if (node2Append instanceof Fizzle)
                 node2Append = node2Append.dom();
             if (node2Append.nodeType !== 1 && typeof node2Append === "string")
@@ -453,7 +474,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         insertAfter: function (node2Append, ref) {
             if (typeof ref === "undefined")
                 return this.append(node2Append);
-            var i = 0, node, offset = this["offset"];
+            var i = 0, node;
             if (node2Append instanceof Fizzle)
                 node2Append = node2Append.dom();
             if (node2Append.nodeType !== 1 && typeof node2Append === "string")
@@ -478,30 +499,29 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
          * @return {Boolean} 是否移除成功
          */
         remove: function () {
-            var i = 0, node, offset = this["offset"];
+            var i = 0, node;
             while (node = this[i++]) {
                 if (!node.parentNode || node.parentNode === node)
                     continue;
                 node.parentNode.removeChild(node);
             }
-            return true;
         },
         //获取或设置一个属性的值
         attr: function (name, value) {
-            var i, offset = this["offset"];
-            return css.attr(this[offset], name, value);
+            return css.attr(this[this.offset], name, value);
         },
         //炒菜, 这也是整个框架为什么叫做cook.js的原因吧，哈
         cook: function (condiment) {
-            var i, offset = this["offset"];
+            var i;
             for (i in condiment) {
-                if (i in this)
+                if (condiment.hasOwnProperty(i) && i in this)
                     this[i](condiment[i]);
             }
+            return this;
         },
         //设置样式
         css: function (style, val) {
-            var node, i = 0, j, offset = this["offset"];
+            var node, i = 0, j;
             //检查是简单的"display", "none"形式（只设置单个属性或获取值）
             //还是如{"position":  "absolute", "left": "1px", "top":"1px"}的复杂形式（同时设置多个）
             if (val === undefined && typeof style === "object") {
@@ -512,7 +532,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                 }
             } else {
                 if (val === undefined)
-                    return css.style(this[offset], style, val);
+                    return css.style(this[this.offset], style, val);
                 else {
                     while (node = this[i++]) {
                         css.style(node, style, val);
@@ -523,22 +543,23 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         },
         //切换至禁用状态,通常是对于提交按钮
         disable: function () {
-            var i = 0, node, offset = this["offset"];
+            var i = 0, node;
             while (node = this[i++]) {
                 node.disabled = true;
             }
+            return this;
         },
         //判断是否被禁用
         disabled: function () {
-            var offset = this["offset"];
-            return css.attr(this[offset], "disabled") === null? false : true;
+            return css.attr(this[this.offset], "disabled") === null? false : true;
         },
         //切换至启用状态,通常是对于提交按钮
         enable: function () {
-            var i = 0, node, offset = this["offset"];
+            var i = 0, node;
             while (node = this[i++]) {
                 css.removeAttr(node, "disabled");
             }
+            return this;
         },
         //判断是否被启用
         enabled: function () {
@@ -549,10 +570,11 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
             for (var i=0; i< this.length; i++){
                 closure.apply(this[i]);
             }
+            return this;
         },
         //在节点下寻找子元素
         find: function (selector) {
-            return new Fizzle(selector, this[0]);
+            return new Fizzle(selector, this[this.offset]);
         },
         //向祖先节点寻找最新的匹配元素
         closest: function (selector) {
@@ -567,18 +589,19 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                     break;
                 }
             }
-            return matched.length > 1? matched : new Fizzle(matched[0]);
+            return (matched.length > 1? (new Fizzle(matched)) : (new Fizzle(matched[0])));
         },
         //设置innerHTML
         html: function (text) {
-            var i = 0, node, offset = this["offset"];
+            var i = 0, node;
             //如果text被设置则设置值，否则返回值
             if (text === undefined)
-                return this[offset].innerHTML;
+                return this[this.offset].innerHTML;
             else
                 while (node = this[i++]) {
                     node.innerHTML = text;
                 }
+            return this;
         },
         //获取第一个元素的outerHTML
         outerHTML: function () {
@@ -589,14 +612,14 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         },
         //注册事件
         on: function (ets, comp) {
-            var node, i = offset = this["offset"], evIds = [];
+            var node, i = 0, evIds = [];
             while (node = this[i++]) {
                 evIds.push(events.on(node, ets, comp));
             }   
             return evIds.length > 1? evIds : evIds[0];
         },
         live: function (ets, comp) {
-            var node, i = offset = this["offset"];
+            var node, i = 0;
             while (node = this[i++]) {
                 events.live(this.selector, ets, comp);
             }   
@@ -628,7 +651,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         },
         //offset相关
         offsetLeft: function (acc) {
-            var offset = this["offset"], node = this[offset], x = 0;
+            var node = this[this.offset], x = 0;
             if (isWindow(acc)) {
                 while (node !== null) {
                     x += node.offsetLeft;
@@ -636,10 +659,10 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                 }
                 return x;
             } else
-                return this[offset].offsetLeft;
+                return node.offsetLeft;
         },
         offsetTop: function (acc) {
-            var offset = this["offset"], node = this[offset], y = 0;
+            var node = this[this.offset], y = 0;
             if (cookjs.isWindow(acc)) {
                 while (node !== null) {
                     y += node.offsetTop;
@@ -647,7 +670,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                 }
                 return y;
             } else
-                return this[offset].offsetTop;
+                return node.offsetTop;
         },
         /**
          * @method parent
@@ -677,20 +700,16 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
 
             return -1;
         },
-        //将dom节点顺序置反
-        reverse: function () {
-        },
         //移除一个或多个属性
         removeAttr: function (value) {
-            var i = 0, node, offset = this["offset"];
+            var i = 0, node;
             while (node = this[i++]) {
                 css.removeAttr(node, value);
             }
         },
         //注销事件
         un: function (ets) {
-            var offset = this["offset"];
-            events.on(this[offset], ets);
+            events.on(this[this.offset], ets);
         },
         //获取input元素的值
         val: function (val) {
@@ -701,7 +720,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                 this[this.offset].value = val;
         },
         //最后，额外定义一些此模块的信息供外界查看
-        version: "0.0.1"
+        fizzle: "0.0.1"
     };
 
     /**
@@ -710,9 +729,14 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
      * @param {Object} context
      *     节点的上下文，即节点的初始选择范围
      */
-    return function (selector, context) {
-        return new Fizzle(selector, context);
-    };
+    var fizzleCtl =  function (selector, context) {
+            return new Fizzle(selector, context);
+        };
+        fizzleCtl.noConflict = function () {
+            $ = dollar;
+        };
+
+    return fizzleCtl;
 });
 
 /**
@@ -738,4 +762,9 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
  *                      以提升容错能力，见 Todo
  * 2014/05/30   0.0.1   添加了insertBefore()和insertAfter()方法
  * 2014/06/03   0.0.1   修复insertAfter()方法在ref无效时无法插入节点的问题
+ *                      html()方法现在总是返回其自身的Fizzle包装
+ * 2014/06/06   0.0.1   Fizzle对象作为类数组对象现在更符合标准
+ *                      容错处理，无论结果如何都返回一个Fizzle实例。这样就不会会因为返回不正确而影响到promise模型了
+ *                      更改根据字符串方式创建节点的方式(jquery太伟大了)
+ *                      现在全局空间的$在替换之前将会被保留，使用fizzleCtl.noConflict()方法可以恢复原始$的定义
  */
