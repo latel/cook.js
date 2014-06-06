@@ -367,6 +367,32 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
             this.offset = len -1 - this.offset;
             return this;
         },
+        shift: function () {
+            if (this.length > 1) {
+                var el = this[0];
+                delete this[0];
+                if (this.offset !== 0)
+                    this.offset--;
+                this.length--;
+                return el;
+            } else
+                return false;
+        },
+        pop: function () {
+            if (this.length > 1) {
+                var el = this[this.length - 1];
+                delete this[this.length - 1];
+                if (this.offset === (this.length - 1))
+                    this.offset--;
+                this.length--;
+                return el;
+            } else
+                return false;
+        },
+        pick: function (index) {
+        	   if (index < this.length)
+        	       this.offset = index;
+        },
         /**
          * 清空包装对象中已有的节点对象列表
          * @method empty
@@ -567,8 +593,9 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         },
         //用于循环处理每一个元素的方法
         each: function (closure) {
-            for (var i=0; i< this.length; i++){
-                closure.apply(this[i]);
+            for (var i = 0; i < this.length; i++){
+                if (closure.apply(this[i], [i, this[i]]) === false)
+                	break;
             }
             return this;
         },
@@ -766,5 +793,9 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
  * 2014/06/06   0.0.1   Fizzle对象作为类数组对象现在更符合标准
  *                      容错处理，无论结果如何都返回一个Fizzle实例。这样就不会会因为返回不正确而影响到promise模型了
  *                      更改根据字符串方式创建节点的方式(jquery太伟大了)
- *                      现在全局空间的$在替换之前将会被保留，使用fizzleCtl.noConflict()方法可以恢复原始$的定义
+ *                      现在全局空间的$在替换之前将会被保留，使用fizzleCtl.noConflict()函数可以恢复原始$的定义
+ *                      添加了shift()和pop()方法
+ *                      toggleClass()方法现在更加强大
+ *                      each()方法现在会将index和当前el作为实参传递给closure, 并且当closure返回false时, each()将
+ *                      终止执行并立即返回Fizzle对象本身
  */
