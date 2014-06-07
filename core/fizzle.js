@@ -122,7 +122,6 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
             switch (type) {
                 case "odd":
                     for (len = rets.length, j = rets.length - 1; j >= 0; j--) {
-                        //shortcut
                         ret = rets[j];
                         if (j%2 == 1) {
                             rets.splice(j, 1);
@@ -134,7 +133,6 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
 
                 case "even":
                     for (len = rets.length, j = rets.length - 1; j >= 0; j--) {
-                        //shortcut
                         ret = rets[j];
                         if (j%2 == 0) {
                             rets.splice(j, 1);
@@ -150,7 +148,6 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                     seed = seed || 1;
                     if (seed < 1) {
                         for (j = 0, len = rets.length; j < len; j++) {
-                            //shortcut
                             dice = Math.random();
                             ret = rets[j];
                             if (dice > seed) {
@@ -185,24 +182,50 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                     rets = [rets[seed.match(/\d+/)[0]||0] || rets[0]];
                     break;
 
-                //所有大于指定编号的元素
+                //所有大于等于指定编号的元素
                 case "gt":
+                    rets = [rets.slice(seed.match(/\d+/)[0]||0) || rets];
                     break;
 
-                //所有小于指定编号的元素
+                //所有小于等于指定编号的元素
                 case "lt":
+                    rets = [rets.slice(0, seed.match(/\d+/)[0]||undefined) || rets];
                     break;
 
-                //无子（元素）节点的所有元素
+                //无子（元素）节点的所有元素(叶子节点)
                 case "empty":
+                    for (len = rets.length, j = rets.length - 1; j >= 0; j--) {
+                        ret = rets[j];
+                        if (ret.hasChildNodes()) {
+                            rets.splice(j, 1);
+                            len--;
+                            --j;
+                        }
+                    }
                     break;
 
                 //所有被隐藏的元素(拥有display:none或visibility:hidden的元素)
                 case "hidden":
+                    for (len = rets.length, j = rets.length - 1; j >= 0; j--) {
+                        ret = rets[j];
+                        if (css.css(ret, "display") !== "none" && css.css(ret, "visibility") !== "hidden") {
+                            rets.splice(j, 1);
+                            len--;
+                            --j;
+                        }
+                    }
                     break;
 
                 //所有可见的元素(和hidden相反)
                 case "visible":
+                    for (len = rets.length, j = rets.length - 1; j >= 0; j--) {
+                        ret = rets[j];
+                        if (css.css(ret, "display") === "none" && css.css(ret, "visibility") === "hidden") {
+                            rets.splice(j, 1);
+                            len--;
+                            --j;
+                        }
+                    }
                     break;
             }
         }
@@ -276,27 +299,36 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                     this.length = 1;
                     this.selector = "";
                 } else {
-                    //运行到这里意味着选择器是个比较复杂的形式
-                    //@var {String} selectorEl 选择器的单个元素，如：
-                    //    $("div#nerd.is ul.happy li p, input.me");
-                    //    将会被视为
-                    //        div#nerd.is ul.happy li p,
-                    //        input.me
-                    //    2个选择器所匹配的元素的组合
-                    //@var {Array} nodes 临时存储匹配到的节点
-                    selectorEl  = selector.split(",");
-                    this.length = 0;
-                    for (i = 0, len = selectorEl.length; i < len; i++) {
-                        j     = 0;
-                        //空白的节点不应该被检测，写错了？
-                        if (selectorEl[i] && !/^\s+$/.test(selectorEl[i])) {
-                            nodes = matchEl(selectorEl[i], context);
-                            while (node = nodes[j++]) {
-                                this[this.offset++] = node;
-                                this.length++;
+                    //我们是否可以使用querySelectorAll()?
+                    if (false && context.querySelectorAll && !/(:|\(|\))/i.test(selector)) {
+                        var ret = Element.prototype.querySelectorAll.call(context, selector), i = 0, len = ret.length;
+                        for (; i < len; i++) {
+                            this[i] = ret[i];
+                        }
+                          this.length = ret.length;
+                      } else {
+                           //运行到这里意味着选择器是个比较复杂的形式
+                        //@var {String} selectorEl 选择器的单个元素，如：
+                        //    $("div#nerd.is ul.happy li p, input.me");
+                        //    将会被视为
+                        //        div#nerd.is ul.happy li p,
+                        //        input.me
+                        //    2个选择器所匹配的元素的组合
+                        //@var {Array} nodes 临时存储匹配到的节点
+                        selectorEl  = selector.split(",");
+                        this.length = 0;
+                        for (i = 0, len = selectorEl.length; i < len; i++) {
+                            j     = 0;
+                            //空白的节点不应该被检测，写错了？
+                            if (selectorEl[i] && !/^\s+$/.test(selectorEl[i])) {
+                                nodes = matchEl(selectorEl[i], context);
+                                while (node = nodes[j++]) {
+                                    this[this.offset++] = node;
+                                    this.length++;
+                                }
                             }
                         }
-                    }
+                      }
                 }
             }
         }
@@ -312,7 +344,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         var j;
         // IE6-8不能正确的序列化 link, script, style 和 任意html5 标签
         // 除非以div包裹并且前缀一个不可被切割的字符
-		var wrapMap = cookjs.genSupport() && support.htmlSerialize ? [ 1, "", "" ] : [ 2, "X<div>", "</div>"  ]
+        var wrapMap = cookjs.genSupport() && support.htmlSerialize ? [ 1, "", "" ] : [ 2, "X<div>", "</div>"  ]
         var fragment = document.createDocumentFragment(),
             tmp = fragment.appendChild(document.createElement("DIV"));
             tmp.innerHTML = wrapMap[1] + constructor + wrapMap[2];
@@ -326,8 +358,6 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
 
     //像Jquery一样封装一些方法使之成为fizzle对象？
     Fizzle.prototype = {
-        //对外的公开的
-        //用于获取fizzle对象内部信息的闭包
         //使Fizzle对象成为一个类数组对象
         size: function () {
             return this.length;
@@ -390,8 +420,8 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                 return false;
         },
         pick: function (index) {
-        	   if (index < this.length)
-        	       this.offset = index;
+            if (index < this.length)
+                this.offset = index;
         },
         /**
          * 清空包装对象中已有的节点对象列表
@@ -595,7 +625,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         each: function (closure) {
             for (var i = 0; i < this.length; i++){
                 if (closure.apply(this[i], [i, this[i]]) === false)
-                	break;
+                    break;
             }
             return this;
         },
