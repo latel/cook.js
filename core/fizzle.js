@@ -633,7 +633,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         find: function (selector) {
             return new Fizzle(selector, this[this.offset]);
         },
-        //向祖先节点寻找最新的匹配元素
+        //向祖先节点寻找最近的匹配元素
         closest: function (selector) {
             var matched = [],
                 i = 0,
@@ -641,9 +641,10 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
                 l = this.length;
             for ( ; i < l; i++ ) {
                 for ( cur = this[i].parentNode; cur && cur !== document; cur = cur.parentNode ) {
-                    if (cur.tagName === selector.toUpperCase())
+                    if (cur.tagName === selector.toUpperCase()) {
                         matched.push(cur);
-                    break;
+                        break;
+                    }
                 }
             }
             return (matched.length > 1? (new Fizzle(matched)) : (new Fizzle(matched[0])));
@@ -709,7 +710,7 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
         //offset相关
         offsetLeft: function (acc) {
             var node = this[this.offset], x = 0;
-            if (isWindow(acc)) {
+            if (cookjs.isWindow(acc)) {
                 while (node !== null) {
                     x += node.offsetLeft;
                     node = node.offsetParent;
@@ -828,4 +829,5 @@ define(["core://css", "core://events", "core://base"], function (css, events) {
  *                      toggleClass()方法现在更加强大
  *                      each()方法现在会将index和当前el作为实参传递给closure, 并且当closure返回false时, each()将
  *                      终止执行并立即返回Fizzle对象本身
+ * 2014/06/08  0.0.1    修复了closest()方法的逻辑错误
  */
