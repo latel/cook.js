@@ -100,9 +100,10 @@ define(["core://base"], function() {
         //切换某个/某些类名的存在
         toggleClass: function(obj, value, stateVal) {
             //stateVal
-            // =undefined: 单纯的切换存在与不存在
+            // =(undefined): 单纯的切换存在与不存在
             // =false    : 全部移除（关闭）
             // =true     : 全部添加（打开）
+            // =(integer): 除了指定的index为真，其他的都为假
             var classes, j = 0;
             stateVal = typeof stateVal === "boolean" ? stateVal: undefined;
 
@@ -155,7 +156,22 @@ define(["core://base"], function() {
             //分两种情况
             //1.只有name被赋值且为字符串，则可以断言是获取attr属性
             //2.name和value都被赋值且为字符串类型，则可以断言为设置attr属性
+            var propName = { 
+                'tabindex'        : 'tabIndex', 
+                'readonly'        : 'readOnly', 
+                'for'             : 'htmlFor', 
+                'class'           : 'className', 
+                'maxlength'       : 'maxLength', 
+                'cellspacing'     : 'cellSpacing', 
+                'cellpadding'     : 'cellPadding', 
+                'rowspan'         : 'rowSpan', 
+                'colspan'         : 'colSpan', 
+                'usemap'          : 'useMap', 
+                'frameborder'     : 'frameBorder', 
+                'contenteditable' : 'contentEditable' 
+            };
             if (value == undefined) {
+                (is.IE < 8) && propName[name] && (name = propName[name]);
                 return obj.getAttribute(name);
             } else {
                 obj.setAttribute(name, value, true);
@@ -221,4 +237,5 @@ define(["core://base"], function() {
  * 2014/03/12   0.0.1   模块创建
  * 2014/03/20   0.0.1   功能完善
  * 2014/04/18   0.0.1   修复一个批量添加css属性时的小错误
+ * 2014/06/10   0.0.1   修复IE6,7下属性设置和获取时的兼容性错误
  */
