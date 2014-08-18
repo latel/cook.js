@@ -11,8 +11,6 @@
  *               支持插件 （语法 模块名!，如core://domReady!，插件区别于核心模块库）
  */
 
-//外部缩写接口，以期兼容requireJs
-var cookjs, define, ready, require;
 /**
  * 加载器入口
  * 使用匿名立即执行函数以便将加载器的内部环境同全局作用域隔绝开，
@@ -20,7 +18,7 @@ var cookjs, define, ready, require;
  * @param  {Object} global
  * @return {Object} 加载器接口
  */
-cookjs = (function (global) {
+(function (global) {
     //申明以 ES5严格标准运行
     "use strict";
 
@@ -399,11 +397,7 @@ cookjs = (function (global) {
         build: "2014/05/09 nightly"
     };
 
-    define  = function(){cookJsApi.define.apply(cookJsApi, arguments);};
-    ready   = function(){cookJsApi.ready.apply(cookJsApi, arguments);};
-    require = function(){cookJsApi.require.apply(cookJsApi, arguments);};
-
-    cookJs.noConflict = function() {
+    cookJsApi.noConflict = function() {
         if (global.define === define) {
             global.define = _define;
         }
@@ -412,7 +406,11 @@ cookjs = (function (global) {
         }
     };
 
-    return cookJsApi;
+    global.define  = function(){cookJsApi.define.apply(cookJsApi, arguments);};
+    global.ready   = function(){cookJsApi.ready.apply(cookJsApi, arguments);};
+    global.require = function(){cookJsApi.require.apply(cookJsApi, arguments);};
+    global.cookjs = cookJsApi;
+
 })(window);
 
 
