@@ -4,10 +4,10 @@
  * @version   0.0.1
  * @link      http://www.oschina.net/code/snippet_1457422_33600
  * @compatity IE6+
- * @todo      
+ * @todo      修复一个在IE7上取值为null的bug
  */
 
-cookJs.define("placeholder", ["fizzle", "events", "css"], function ($, events, css) {
+define(["core://fizzle", "core://events", "core://css", "core://base"], function ($, events, css) {
     //检测是否浏览器是否现代化到足够原生支持placeholder
     var input = document.createElement('input');
     if ("placeholder" in input) 
@@ -42,8 +42,8 @@ cookJs.define("placeholder", ["fizzle", "events", "css"], function ($, events, c
         });
 
         //生成一个字符串以标记浮动层和输入框之间的一一对应关系
-        clazzes = cookJs.trim(
-                      cookJs.arrayFilter(
+        clazzes = cookjs.trim(
+                      cookjs.arrayFilter(
                           this.className.split(/\s+/g)
                       )
                   ).join(".");

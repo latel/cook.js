@@ -4,7 +4,7 @@
  * @compatity IE6+
  */
 
-cookJs.define("animation", ["css", "events"], function (css, events) {
+define(["core://css", "core://events"], function (css, events) {
 });
 
 /**

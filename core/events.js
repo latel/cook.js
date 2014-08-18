@@ -3,7 +3,7 @@
  *               提供一个跨浏览器兼容的可注册并注销的事件管理器
  * @author       latelx64@gmail.com (Kezhen Wong)
  * @version      0.0.1
- * @link         https://github.com/latel/cookJs/module/event.js
+ * @link         https://github.com/latel/cook.js/core/event.js
  * @example      以下实例均假定本模块的实体被返回给变量 events,即
  *               require("events", function(events){/您的代码/});
  *
@@ -74,18 +74,19 @@
  * @compatity    IE6+, Chrome, Firefox, Safari
  */
 
-cookJs.define("events", [], function() {
+define(["core://base"], function() {
     /**
-     * @var {Object}   fnCache     缓存修改过的处理函数（主要是出于IE下的this指针问题）
-     * @var {Integer}  evIdOffset  事件序号偏移，模块自动处理，不需要维护此值
-     * @var {Integer}  HTMLElementOffet
-     *                             HTMLElement序号偏移
-     * @var {Object}   evHash      事件索引，藉此可以使用事件序号找到具体的事件类型(type)和绑定的对象
-     * @var {Object}   nsMap       命名空间表，查阅注册到此命名空间下的处理函数
-     *                             (不同的对象，即使命名空间相同，也是独立的)
-     * @var {Function} debounce    用于防止某些函数被触发多次
+     * @var {Object}   fnCache            缓存修改过的处理函数（主要是出于IE下的this指针问题）
+     * @var {Integer}  evIdOffset         事件序号偏移，模块自动处理，不需要维护此值
+     * @var {Integer}  HTMLElementOffet   HTMLElement序号偏移
+     * @var {Object}   evHash             事件索引，藉此可以使用事件序号找到具体的事件类型(type)和绑定的对象
+     * @var {Object}   nsMap              命名空间表，查阅注册到此命名空间下的处理函数
+     * @var {Object}   liveEvents         用于支持live事件的表
+     *                                    (不同的对象，即使命名空间相同，也是独立的)
+     * @var {Function} debounce           用于防止某些函数被触发多次
      */
-    var fnCache    = {},
+    var eventsCtl,
+        fnCache    = {},
         evIdOffset = 0,
         HTMLElementOffset = 0,
         evHash     = {},
@@ -105,22 +106,24 @@ cookJs.define("events", [], function() {
                 else if (execAsap) 
                     func.apply(obj, args);
                 timeout = setTimeout(delayed, threshold || 100);
-        };
-    };
+            };
+        },
+        liveEvents;
 
-    return {
+    eventsCtl = {
         /**
          * 绑定事件
-         * @param {HTML DOM OBJECT} obj 要绑定事件的目标节点
-         * @param {String|Object} ets 命名空间字符串|事件名(单个事件时的写法)或对象(多个事件时的写法)
-         * @param {Function} comp (可选) 单个事件写法时的事件处理函数
-         * @return {Number|Array Object} 返回事件ID（单个)或ID列表(多个)
+         * @param  {HTML DOM OBJECT} obj  要绑定事件的目标节点
+         * @param  {String|Object}   ets  命名空间字符串|事件名(单个事件时的写法)或对象(多个事件时的写法)
+         * @param  {Function}        comp (可选) 单个事件写法时的事件处理函数
+         * @return {Number|Array} 返回事件ID（单个)或ID列表(多个)
          */
         on: function (obj, ets, comp) {
             var fn, i, j, len, et, evIds = [], hid;
+            var isWindow = cookjs.isWindow(obj);
             //初步检查传递的参数格式并可能做出相应的转换
             //用于支持单个事件的语法
-            if (obj.nodeType !== 1) 
+            if (obj.nodeType !== 1 && obj.nodeType !== 9 && !isWindow) 
                 return false;
 
             if (typeof ets === "string" && typeof comp === "function") {
@@ -166,21 +169,24 @@ cookJs.define("events", [], function() {
                 //记录到事件索引
                 evHash[evIdOffset] = [obj, i];
 
-                //从HTMLElementOffset生产一个惟一的DOM序号
-                hid = obj.getAttribute("data-cookJsEv-id");
-                if (!hid) {
-                    hid = ++HTMLElementOffset;
-                    obj.setAttribute("data-cookJsEv-id", hid, true);
-                }
+                //从HTMLElementOffset生产一个惟一的DOM序号,
+                //如果对象是window，则可以跳过下面的环节
+                if (!isWindow && obj !== document) {
+                    hid = obj.getAttribute("data-cookJsEv-id");
+                    if (!hid) {
+                        hid = ++HTMLElementOffset;
+                        obj.setAttribute("data-cookJsEv-id", hid, true);
+                    }
 
-                //记录命名空间
-                if (nsMap[hid] === undefined)
-                    nsMap[hid] = {};
-                if (nsMap[hid][i]) {
-                    nsMap[hid][i].push(evIdOffset);
-                } else
-                    nsMap[hid][i] = [evIdOffset];
-                i  = i.match(/^\w+/)[0];
+                    //记录命名空间
+                    if (nsMap[hid] === undefined)
+                        nsMap[hid] = {};
+                    if (nsMap[hid][i]) {
+                        nsMap[hid][i].push(evIdOffset);
+                    } else
+                        nsMap[hid][i] = [evIdOffset];
+                    i  = i.match(/^\w+/)[0];
+                }
 
                 if (obj.addEventListener) {
                     //标准浏览器的事件绑定
@@ -214,6 +220,9 @@ cookJs.define("events", [], function() {
                 return evIds[0];
             } else
                 return evIds;
+            console.log();
+        },
+        live: function(selector, etc, comp) {
         },
         /**
          * 解绑事件
@@ -225,7 +234,7 @@ cookJs.define("events", [], function() {
             var fn, i = 0, j = 0, objets, nsets, et, ns;
             //初步检查传递的参数格式并做出可能的转换
             //用于支持单个事件的语法
-            if (obj.nodeType != 1) 
+            if (obj.nodeType !== 1 && obj.nodeType !== 9 && !isWindow) 
                 return false;
 
             //提前注册一个事件处理函数
@@ -291,6 +300,8 @@ cookJs.define("events", [], function() {
             }
         }
     };
+
+    return eventsCtl;
 });
 
 
@@ -304,4 +315,6 @@ cookJs.define("events", [], function() {
  * 2014/04/04   0.0.1   修复了命名空间表的下标不准确问题（在HTMLElement上添加索引）
  *                      添加了trigger方法
  *                      ie现在兼容ev.preventDefault()
+ * 2014/04/17   0.0.1   修复了在window上绑定/解绑事件时无效的问题
+ * 2014/05/11   0.0.1   修复无法在document上绑定事件的bug
  */
